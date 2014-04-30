@@ -1,19 +1,80 @@
 $( function() {
 	game = {
-		count: 0
+		paused: false
 	};
 
 	game.init = function() {
 		game.clock_reset();
-		game.clock.interval = window.setInterval( game.clock_update, game.clock.delay );
 
-		setInterval( game.update, 1000 );
+		// on initial load, override the clock variables with what was loaded onto the page
+		game.clock.hour = parseInt( $( '#hour' ).text() );
+		game.clock.minute = parseInt( $( '#minute' ).text() );
+		game.clock.meridiem = $( '#meridiem' ).text();
+
+		game.clock_start();
+
+		$(document).on( "keyup", game.check_keys );
+
+		$(document).on( "click", "#pause", game.pause );
+		$(document).on( "click", "#save", game.save );
+		$(document).on( "click", "#reset", game.reset );
 	};
 
-	game.update = function( ) {
-		game.count++;
+	game.check_keys = function( e ) {
+		if ( e.keyCode == 27 && ! game.paused ) {
+			game.pause();
+		}
+	};
 
-		$('#account p').html( '$' + game.count );
+	game.save = function() {
+		$( '#form_name').val( $( '#stand p' ).text() );
+		$( '#form_balance').val( $( '#account p' ).text() );
+		$( '#form_price').val( $( '#price p' ).text() );
+		$( '#form_customers').val( $( '#customers p' ).text() );
+		$( '#form_date').val( $( '#date h2' ).text() );
+		$( '#form_juice').val( $( '#product p' ).text() );
+		$( '#form_fruit').val( $( '#inventory p' ).text() );
+		$( '#form_time').val( $( '#hour' ).text() + ':' + $( '#minute' ).text() + ' ' + $( '#meridiem' ).text() );
+
+		$( '#save_form' ).submit();
+	};
+
+	game.reset = function() {
+		game.clock_reset();
+		game.clock_update();
+	};
+
+	game.pause = function() {
+		game.clock_stop();
+		game.paused = true;
+
+		$.colorbox( {
+			href: "pause.php",
+			onClosed: game.unpause,
+			title: "Game is paused"
+		} );
+	};
+
+	game.unpause = function() {
+		if ( ! game.paused ) {
+			return false;
+		}
+
+		game.clock_start();
+		game.paused = false;
+	}
+
+	game.clock_start = function() {
+		if ( game.clock.interval ) {
+			return false;
+		}
+
+		game.clock.interval = window.setInterval( game.clock_update, game.clock.delay );
+	};
+
+	game.clock_stop = function() {
+		clearInterval( game.clock.interval );
+		game.clock.interval = false;
 	}
 
 	game.clock_reset = function() {
@@ -21,17 +82,50 @@ $( function() {
 			hour: 8,
 			minute: 0,
 			meridiem: 'AM',
-			pad: '00', // use to build minute padding
+			count: 0,
+			pad: '00',
 			delay: 500,
-			count: 0, // incremented on each clock update
-			speed: 2, // how many clock updates before incrementing the clock
-			increment: 1 // how many minutes to increment on each tick
+			speed: 2,
+			increment: 1,
+			interval: false
 		};
 	};
 
 	game.clock_update = function() {
-		// flash the #separator
-		// update #hour, #minute, #meridiem
+		game.clock.count += game.clock.delay;
+
+		if ( game.clock.count % ( game.clock.delay * game.clock.speed ) ) {
+			$( '#separator' ).html( '&nbsp;' );
+
+			game.clock.minute += game.clock.increment;
+			if ( 60 <= game.clock.minute ) {
+				game.clock.minute = 0;
+				game.clock.hour++;
+
+				if ( 12 == game.clock.hour ) {
+					if ( 'AM' == game.clock.meridiem ) {
+						game.clock.meridiem = 'PM';
+					}
+					else {
+						game.clock.meridiem = 'AM';
+					}
+				}
+				else if ( 13 <= game.clock.hour ) {
+					game.clock.hour = 1;
+				}
+				else if ( 5 == game.clock.hour && 'PM' == game.clock.meridiem ) {
+					console.log( 'Closing time!');
+					game.clock_stop;
+				}
+			}
+
+			$( '#hour' ).html( game.clock.hour );
+			$( '#minute' ).html( game.clock_padded_minute() );
+			$( '#meridiem' ).html( game.clock.meridiem );
+		}
+		else {
+			$( '#separator' ).html( ':' );
+		}
 	};
 
 	game.clock_padded_minute = function() {
